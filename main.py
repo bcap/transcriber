@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import queue
 import sys
@@ -6,6 +7,7 @@ import time
 import numpy as np
 import sounddevice as sd
 from faster_whisper import WhisperModel
+from faster_whisper.transcribe import Segment
 
 SAMPLE_RATE = 16000
 CHUNK_MS = 100
@@ -15,6 +17,8 @@ SILENCE_RMS_THRESHOLD = 0.01
 SILENCE_CHUNKS_TO_FLUSH = 8   # 800ms of silence triggers transcription
 MIN_SPEECH_CHUNKS = 4          # ignore bursts shorter than 400ms
 
+OUTPUT_FORMATS = ("plain", "annotated", "jsonl")
+
 log = logging.getLogger(__name__)
 
 
@@ -23,7 +27,8 @@ def parse_args():
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("-i", "--input", metavar="FILE", help="input audio file")
     source.add_argument("-s", "--stream", action="store_true", help="stream from microphone in real time")
-    parser.add_argument("-o", "--output", metavar="FILE", help="output markdown file (default: stdout)")
+    parser.add_argument("-o", "--output", metavar="FILE", help="output file (default: stdout)")
+    parser.add_argument("-f", "--output-format", choices=OUTPUT_FORMATS, default="plain", help="output format (default: plain)")
     parser.add_argument("-l", "--language", help="language code (e.g. en, pt); auto-detect if omitted")
     parser.add_argument("-p", "--prompt", help="initial prompt text, or @path to read from file")
     parser.add_argument("-t", "--temperature", type=float, help="sampling temperature (default: faster-whisper default)")
@@ -50,7 +55,31 @@ def build_transcribe_kwargs(args) -> dict:
     return kwargs
 
 
-def transcribe_file(model: WhisperModel, audio: str, output: str | None, kwargs: dict) -> None:
+def format_segment(s: Segment, fmt: str, language: str | None = None, language_probability: float | None = None, session_offset: float = 0.0, chunk_duration: float | None = None) -> str:
+    text = s.text.strip()
+    if fmt == "plain":
+        return text
+    start = session_offset + s.start
+    end = session_offset + s.end
+    if fmt == "annotated":
+        ts = f"[{start:.1f}s-{end:.1f}s]"
+        lang = f"[{language}:{language_probability:.0%}]" if language else ""
+        return f"{lang:<8} {ts:<13} {text}"
+    # jsonl
+    obj: dict = {
+        "start": round(start, 2),
+        "end": round(end, 2),
+        "chunk_duration": round(chunk_duration, 2) if chunk_duration is not None else None,
+        "language": language,
+        "language_probability": round(language_probability, 2) if language_probability is not None else None,
+        "avg_logprob": round(s.avg_logprob, 2),
+        "no_speech_prob": round(s.no_speech_prob, 2),
+        "text": text,
+    }
+    return json.dumps(obj, ensure_ascii=False)
+
+
+def transcribe_file(model: WhisperModel, audio: str, output: str | None, fmt: str, kwargs: dict) -> None:
     log.info("transcribing %s", audio)
     segments, info = model.transcribe(audio, **kwargs)
     log.debug("detected language: %s (%.0f%%)", info.language, info.language_probability * 100)
@@ -58,14 +87,14 @@ def transcribe_file(model: WhisperModel, audio: str, output: str | None, kwargs:
     try:
         for s in segments:
             log.debug("[%.1fs-%.1fs] %s", s.start, s.end, s.text.strip())
-            f.write(f"- [{s.start:.1f}s-{s.end:.1f}s] {s.text.strip()}\n")
+            f.write(format_segment(s, fmt, language=info.language, language_probability=info.language_probability, chunk_duration=s.end - s.start) + "\n")
     finally:
         if output:
             f.close()
             log.info("written to %s", output)
 
 
-def transcribe_stream(model: WhisperModel, output: str | None, kwargs: dict) -> None:
+def transcribe_stream(model: WhisperModel, output: str | None, fmt: str, kwargs: dict) -> None:
     audio_q: queue.Queue[np.ndarray] = queue.Queue()
     session_start = time.monotonic()
 
@@ -76,15 +105,14 @@ def transcribe_stream(model: WhisperModel, output: str | None, kwargs: dict) -> 
 
     def flush(speech_chunks: list[np.ndarray], t_start: float) -> None:
         audio = np.concatenate(speech_chunks).astype(np.float32)
+        chunk_duration = len(audio) / SAMPLE_RATE
         kwargs["vad_filter"] = False
-        segments, _ = model.transcribe(audio, **kwargs)
+        segments, info = model.transcribe(audio, **kwargs)
         kwargs["vad_filter"] = True
-        t_end = time.monotonic() - session_start
         for s in segments:
-            text = s.text.strip()
-            if not text:
+            if not s.text.strip():
                 continue
-            line = f"- [{t_start:.1f}s-{t_end:.1f}s] {text}"
+            line = format_segment(s, fmt, language=info.language, language_probability=info.language_probability, session_offset=t_start, chunk_duration=chunk_duration)
             print(line, flush=True)
             if output:
                 with open(output, "a", encoding="utf-8") as f:
@@ -111,7 +139,7 @@ def transcribe_stream(model: WhisperModel, output: str | None, kwargs: dict) -> 
                 speech_buf = []
                 silence_count = 0
 
-    print("Listening... (Ctrl+C to stop)", file=sys.stderr)
+    print("Transcribing... Press Ctrl+C to stop", file=sys.stderr)
 
     try:
         with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32",
@@ -131,15 +159,18 @@ def main():
     log_level = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}.get(args.verbose, logging.DEBUG)
     logging.basicConfig(level=log_level, format="%(levelname)s %(message)s")
 
-    log.info("loading model")
+    if args.stream:
+        print("Initializing...", file=sys.stderr)
+
+    log.info("loading model: large-v3 on cuda with float16")
     model = WhisperModel("large-v3", device="cuda", compute_type="float16")
 
     kwargs = build_transcribe_kwargs(args)
 
     if args.stream:
-        transcribe_stream(model, args.output, kwargs)
+        transcribe_stream(model, args.output, args.output_format, kwargs)
     else:
-        transcribe_file(model, args.input, args.output, kwargs)
+        transcribe_file(model, args.input, args.output, args.output_format, kwargs)
 
 
 if __name__ == "__main__":
