@@ -20,6 +20,8 @@ parser.add_argument("audio", nargs="?", help="input audio file (omit with --stre
 parser.add_argument("output", nargs="?", help="output markdown file")
 parser.add_argument("-s", "--stream", action="store_true", help="stream from microphone in real time")
 parser.add_argument("-l", "--language", help="language code (e.g. en, pt); auto-detect if omitted")
+parser.add_argument("-p", "--prompt", help="initial prompt text, or @path to read from file")
+parser.add_argument("-t", "--temperature", type=float, help="sampling temperature (default: faster-whisper default)")
 parser.add_argument("-v", "--verbose", action="count", default=0)
 args = parser.parse_args()
 
@@ -27,6 +29,16 @@ if not args.stream and not args.audio:
     parser.error("audio is required unless --stream is set")
 if not args.stream and not args.output:
     parser.error("output is required unless --stream is set")
+
+if args.prompt and args.prompt.startswith("@"):
+    with open(args.prompt[1:], encoding="utf-8") as _f:
+        initial_prompt = _f.read()
+else:
+    initial_prompt = args.prompt
+
+transcribe_kwargs: dict = {"language": args.language, "initial_prompt": initial_prompt, "vad_filter": True, "beam_size": 5}
+if args.temperature is not None:
+    transcribe_kwargs["temperature"] = args.temperature
 
 log_level = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}.get(args.verbose, logging.DEBUG)
 logging.basicConfig(level=log_level, format="%(levelname)s %(message)s")
@@ -37,7 +49,7 @@ model = WhisperModel("large-v3", device="cuda", compute_type="float16")
 
 if not args.stream:
     log.info("transcribing %s", args.audio)
-    segments, info = model.transcribe(args.audio, language=args.language, vad_filter=True)
+    segments, info = model.transcribe(args.audio, **transcribe_kwargs)
     log.debug("detected language: %s (%.0f%%)", info.language, info.language_probability * 100)
     with open(args.output, "w", encoding="utf-8") as f:
         for s in segments:
@@ -56,7 +68,8 @@ else:
 
     def flush(speech_chunks: list[np.ndarray], t_start: float) -> None:
         audio = np.concatenate(speech_chunks).astype(np.float32)
-        segments, _ = model.transcribe(audio, language=args.language, vad_filter=False, beam_size=5)
+        transcribe_kwargs["vad_filter"] = False
+        segments, _ = model.transcribe(audio, **transcribe_kwargs)
         t_end = time.monotonic() - session_start
         for s in segments:
             text = s.text.strip()
