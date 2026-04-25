@@ -9,8 +9,8 @@ Local audio transcription tool using faster-whisper (CTranslate2-based Whisper).
 ## Usage
 
 ```bash
-./run.sh -i <audio_file> [-o output.md] [-f plain|annotated|jsonl] [-l lang] [-t] [-v]
-./run.sh -s [-o output.md] [-f plain|annotated|jsonl] [-l lang] [-t] [-v]
+./run.sh -i <audio_file> [-o output.txt] [-f plain|annotated|jsonl] [-l lang] [-t] [-v]
+./run.sh -s [-o output.txt] [-f plain|annotated|jsonl] [-l lang] [-t] [-v]
 ```
 
 `run.sh` sets `LD_LIBRARY_PATH` to the local CUDA libs in `.venv` before invoking `uv run main.py`.
@@ -36,10 +36,10 @@ Single-file script (`main.py`):
 ## Features
 
 ### Batch transcription
-Transcribes a pre-recorded audio file. Usage: `./run.sh -i <audio> [-o output.md]`. Output defaults to stdout.
+Transcribes a pre-recorded audio file. Usage: `./run.sh -i <audio> [-o output.txt]`. Output defaults to stdout.
 
 ### Streaming transcription (mic)
-Real-time transcription from microphone using RMS-based VAD. Accumulates audio while speech is detected, flushes to faster-whisper on silence. Prints each segment to stdout; optionally writes to a file with `-o`. Usage: `./run.sh -s [-o output.md]`. Tuning constants at top of `main.py`: `SILENCE_RMS_THRESHOLD`, `SILENCE_CHUNKS_TO_FLUSH`, `MIN_SPEECH_CHUNKS`.
+Real-time transcription from microphone using RMS-based VAD. Accumulates audio while speech is detected, flushes to faster-whisper on silence. Prints each segment to stdout; optionally writes to a file with `-o`. Usage: `./run.sh -s [-o output.txt]`. Tuning constants at top of `main.py`: `SILENCE_RMS_THRESHOLD`, `SILENCE_CHUNKS_TO_FLUSH`, `MIN_SPEECH_CHUNKS`.
 
 ## Pending work
 
