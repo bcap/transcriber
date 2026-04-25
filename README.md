@@ -15,6 +15,14 @@ cd transcriber
 uv sync
 ```
 
+The first run will download the Whisper large-v3 model (~3GB) from Hugging Face. It will work without an account, but creating one and setting `HF_TOKEN` enables faster downloads:
+
+```bash
+export HF_TOKEN=your_token_here
+```
+
+Get a token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).
+
 ## Usage
 
 ### Transcribe a file
