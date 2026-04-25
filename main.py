@@ -18,7 +18,8 @@ MIN_SPEECH_CHUNKS = 4          # ignore bursts shorter than 400ms
 parser = argparse.ArgumentParser()
 parser.add_argument("audio", nargs="?", help="input audio file (omit with --stream)")
 parser.add_argument("output", nargs="?", help="output markdown file")
-parser.add_argument("--stream", action="store_true", help="stream from microphone in real time")
+parser.add_argument("-s", "--stream", action="store_true", help="stream from microphone in real time")
+parser.add_argument("-l", "--language", help="language code (e.g. en, pt); auto-detect if omitted")
 parser.add_argument("-v", "--verbose", action="count", default=0)
 args = parser.parse_args()
 
@@ -36,7 +37,7 @@ model = WhisperModel("large-v3", device="cuda", compute_type="float16")
 
 if not args.stream:
     log.info("transcribing %s", args.audio)
-    segments, info = model.transcribe(args.audio, vad_filter=True)
+    segments, info = model.transcribe(args.audio, language=args.language, vad_filter=True)
     log.debug("detected language: %s (%.0f%%)", info.language, info.language_probability * 100)
     with open(args.output, "w", encoding="utf-8") as f:
         for s in segments:
@@ -55,7 +56,7 @@ else:
 
     def flush(speech_chunks: list[np.ndarray], t_start: float) -> None:
         audio = np.concatenate(speech_chunks).astype(np.float32)
-        segments, _ = model.transcribe(audio, vad_filter=False, beam_size=5)
+        segments, _ = model.transcribe(audio, language=args.language, vad_filter=False, beam_size=5)
         t_end = time.monotonic() - session_start
         for s in segments:
             text = s.text.strip()
