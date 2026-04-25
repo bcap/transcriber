@@ -33,6 +33,7 @@ def parse_args():
     parser.add_argument("-p", "--prompt", help="initial prompt text, or @path to read from file")
     parser.add_argument("-t", "--translate", action="store_true", help="translate audio to English (uses Whisper's built-in translation)")
     parser.add_argument("-T", "--temperature", type=float, help="sampling temperature (default: faster-whisper default)")
+    parser.add_argument("-d", "--device", choices=("auto", "cpu", "cuda"), default="auto", help="compute device (default: auto)")
     parser.add_argument("-v", "--verbose", action="count", default=0)
     return parser.parse_args()
 
@@ -176,8 +177,8 @@ def main():
     if args.stream:
         print("Initializing...", file=sys.stderr)
 
-    log.info("loading model: large-v3 on cuda with float16")
-    model = WhisperModel("large-v3", device="cuda", compute_type="float16")
+    log.info("loading model: large-v3 on %s", args.device)
+    model = WhisperModel("large-v3", device=args.device, compute_type="auto")
 
     kwargs = build_transcribe_kwargs(args)
 

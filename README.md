@@ -4,8 +4,8 @@ Local audio transcription using [faster-whisper](https://github.com/SYSTRAN/fast
 
 ## Requirements
 
-- NVIDIA GPU with CUDA support
 - [uv](https://github.com/astral-sh/uv)
+- NVIDIA GPU with CUDA support (optional but recommended; falls back to CPU)
 
 ## Setup
 
@@ -74,4 +74,5 @@ okay this is a simple transcriber test
 | `-t`, `--translate` | Translate to English using Whisper's built-in translation |
 | `-T`, `--temperature` | Sampling temperature |
 | `-p`, `--prompt` | Initial prompt text, or `@filepath` to read from file |
+| `-d`, `--device` | `auto` (default), `cuda`, or `cpu` |
 | `-v` / `-vv` | Increase logging verbosity |
