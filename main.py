@@ -64,17 +64,24 @@ def format_segment(s: Segment, fmt: str, language: str | None = None, language_p
     if fmt == "annotated":
         ts = f"[{start:.1f}s-{end:.1f}s]"
         lang = f"[{language}:{language_probability:.0%}]" if language else ""
-        return f"{lang:<8} {ts:<13} {text}"
+        conf = f"[conf:{s.avg_logprob:.2f}]"
+        return f"{lang:<8} {conf:<14} {ts:<13} {text}"
     # jsonl
     obj: dict = {
-        "start": round(start, 2),
-        "end": round(end, 2),
-        "chunk_duration": round(chunk_duration, 2) if chunk_duration is not None else None,
-        "language": language,
-        "language_probability": round(language_probability, 2) if language_probability is not None else None,
-        "avg_logprob": round(s.avg_logprob, 2),
-        "no_speech_prob": round(s.no_speech_prob, 2),
-        "text": text,
+        "timing": {
+            "start": round(start, 2),
+            "end": round(end, 2),
+            "chunk_duration": round(chunk_duration, 2) if chunk_duration is not None else None,
+        },
+        "speech": {
+            "language": language,
+            "language_probability": round(language_probability, 2) if language_probability is not None else None,
+            "no_speech_prob": round(s.no_speech_prob, 2),
+        },
+        "transcription": {
+            "confidence": round(s.avg_logprob, 2),
+            "text": text,
+        },
     }
     return json.dumps(obj, ensure_ascii=False)
 
