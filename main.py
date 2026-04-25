@@ -20,21 +20,15 @@ log = logging.getLogger(__name__)
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("audio", nargs="?", help="input audio file (omit with --stream)")
-    parser.add_argument("output", nargs="?", help="output markdown file")
-    parser.add_argument("-s", "--stream", action="store_true", help="stream from microphone in real time")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("-i", "--input", metavar="FILE", help="input audio file")
+    source.add_argument("-s", "--stream", action="store_true", help="stream from microphone in real time")
+    parser.add_argument("-o", "--output", metavar="FILE", help="output markdown file (default: stdout)")
     parser.add_argument("-l", "--language", help="language code (e.g. en, pt); auto-detect if omitted")
     parser.add_argument("-p", "--prompt", help="initial prompt text, or @path to read from file")
     parser.add_argument("-t", "--temperature", type=float, help="sampling temperature (default: faster-whisper default)")
     parser.add_argument("-v", "--verbose", action="count", default=0)
-    args = parser.parse_args()
-
-    if not args.stream and not args.audio:
-        parser.error("audio is required unless --stream is set")
-    if not args.stream and not args.output:
-        parser.error("output is required unless --stream is set")
-
-    return args
+    return parser.parse_args()
 
 
 def resolve_prompt(prompt: str | None) -> str | None:
@@ -56,15 +50,19 @@ def build_transcribe_kwargs(args) -> dict:
     return kwargs
 
 
-def transcribe_file(model: WhisperModel, audio: str, output: str, kwargs: dict) -> None:
+def transcribe_file(model: WhisperModel, audio: str, output: str | None, kwargs: dict) -> None:
     log.info("transcribing %s", audio)
     segments, info = model.transcribe(audio, **kwargs)
     log.debug("detected language: %s (%.0f%%)", info.language, info.language_probability * 100)
-    with open(output, "w", encoding="utf-8") as f:
+    f = open(output, "w", encoding="utf-8") if output else sys.stdout
+    try:
         for s in segments:
             log.debug("[%.1fs-%.1fs] %s", s.start, s.end, s.text.strip())
             f.write(f"- [{s.start:.1f}s-{s.end:.1f}s] {s.text.strip()}\n")
-    log.info("written to %s", output)
+    finally:
+        if output:
+            f.close()
+            log.info("written to %s", output)
 
 
 def transcribe_stream(model: WhisperModel, output: str | None, kwargs: dict) -> None:
@@ -141,7 +139,7 @@ def main():
     if args.stream:
         transcribe_stream(model, args.output, kwargs)
     else:
-        transcribe_file(model, args.audio, args.output, kwargs)
+        transcribe_file(model, args.input, args.output, kwargs)
 
 
 if __name__ == "__main__":
