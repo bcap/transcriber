@@ -31,7 +31,8 @@ def parse_args():
     parser.add_argument("-f", "--output-format", choices=OUTPUT_FORMATS, default="plain", help="output format (default: plain)")
     parser.add_argument("-l", "--language", help="language code (e.g. en, pt); auto-detect if omitted")
     parser.add_argument("-p", "--prompt", help="initial prompt text, or @path to read from file")
-    parser.add_argument("-t", "--temperature", type=float, help="sampling temperature (default: faster-whisper default)")
+    parser.add_argument("-t", "--translate", action="store_true", help="translate audio to English (uses Whisper's built-in translation)")
+    parser.add_argument("-T", "--temperature", type=float, help="sampling temperature (default: faster-whisper default)")
     parser.add_argument("-v", "--verbose", action="count", default=0)
     return parser.parse_args()
 
@@ -46,6 +47,7 @@ def resolve_prompt(prompt: str | None) -> str | None:
 def build_transcribe_kwargs(args) -> dict:
     kwargs: dict = {
         "language": args.language,
+        "task": "translate" if args.translate else "transcribe",
         "initial_prompt": resolve_prompt(args.prompt),
         "vad_filter": True,
         "beam_size": 5,
@@ -146,7 +148,12 @@ def transcribe_stream(model: WhisperModel, output: str | None, fmt: str, kwargs:
                 speech_buf = []
                 silence_count = 0
 
-    print("Transcribing... Press Ctrl+C to stop", file=sys.stderr)
+    if kwargs['task'] == "translate":
+        print("Translating... Press Ctrl+C to stop", file=sys.stderr)
+    elif kwargs['task'] == "transcribe":
+        print("Transcribing... Press Ctrl+C to stop", file=sys.stderr)
+    else:
+        raise ValueError(f"unexpected task: {kwargs['task']}")
 
     try:
         with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32",
