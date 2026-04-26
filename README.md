@@ -21,7 +21,7 @@ export HF_TOKEN=your_token_here
 
 Get a token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).
 
-### One-shot via uvx (no install, no clone)
+### One-shot via uvx
 
 ```bash
 uvx --from git+https://github.com/bcap/transcriber transcribe -s

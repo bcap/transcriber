@@ -89,7 +89,7 @@ def format_segment(s: Segment, fmt: str, language: str | None = None, language_p
         ts = f"[{start:.1f}s-{end:.1f}s]"
         lang = f"[{language}:{language_probability:.0%}]" if language else ""
         conf = f"[conf:{s.avg_logprob:.2f}]"
-        return f"{lang:<8} {conf:<14} {ts:<13} {text}"
+        return f"{lang:<8} {conf:<11} {ts:<13} {text}"
     # jsonl
     obj: dict = {
         "timing": {
