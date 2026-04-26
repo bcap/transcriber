@@ -1,6 +1,10 @@
 # transcriber
 
-Local audio transcription using [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (Whisper large-v3). Runs entirely on your machine — no cloud, no API keys.
+Local audio transcription and translation (english only) using [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (Whisper large-v3).
+
+Runs entirely on your machine — no cloud, no API keys.
+
+Can transcribe from an audio file or in realtime from your microphone
 
 ## Requirements
 
@@ -20,14 +24,14 @@ Get a token at [huggingface.co/settings/tokens](https://huggingface.co/settings/
 ### One-shot via uvx (no install, no clone)
 
 ```bash
-uvx --from git+https://github.com/bcap/transcriber transcribe -i audio.mp3
+uvx --from git+https://github.com/bcap/transcriber transcribe -s
 ```
 
 ### Persistent install via uv tool
 
 ```bash
 uv tool install git+https://github.com/bcap/transcriber
-transcribe -i audio.mp3
+transcribe -s
 ```
 
 ### From a local clone
@@ -35,7 +39,7 @@ transcribe -i audio.mp3
 ```bash
 git clone git@github.com:bcap/transcriber.git
 cd transcriber
-uv run transcribe -i audio.mp3
+uv run transcribe -s
 ```
 
 ## Usage
