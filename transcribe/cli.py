@@ -2,10 +2,13 @@ import glob
 import os
 import sys
 
-_cuda_libs = glob.glob(os.path.join(sys.prefix, "lib/python*/site-packages/nvidia/cublas/lib"))
-if _cuda_libs:
-    _lib = _cuda_libs[0]
-    os.environ["LD_LIBRARY_PATH"] = _lib + (":" + os.environ["LD_LIBRARY_PATH"] if os.environ.get("LD_LIBRARY_PATH") else "")
+if not os.environ.get("_TRANSCRIBE_REEXEC"):
+    _cuda_libs = glob.glob(os.path.join(sys.prefix, "lib/python*/site-packages/nvidia/cublas/lib"))
+    if _cuda_libs:
+        _lib = _cuda_libs[0]
+        os.environ["LD_LIBRARY_PATH"] = _lib + (":" + os.environ["LD_LIBRARY_PATH"] if os.environ.get("LD_LIBRARY_PATH") else "")
+        os.environ["_TRANSCRIBE_REEXEC"] = "1"
+        os.execv(sys.executable, [sys.executable] + sys.argv)
 
 import argparse
 import json
