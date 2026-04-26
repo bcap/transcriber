@@ -83,13 +83,15 @@ def format_segment(s: Segment, fmt: str, language: str | None = None, language_p
     text = s.text.strip()
     if fmt == "plain":
         return text
+
     start = session_offset + s.start
     end = session_offset + s.end
     if fmt == "annotated":
-        ts = f"[{start:.1f}s-{end:.1f}s]"
-        lang = f"[{language}:{language_probability:.0%}]" if language else ""
-        conf = f"[conf:{s.avg_logprob:.2f}]"
-        return f"{lang:<8} {conf:<11} {ts:<13} {text}"
+        ts = f"{start:.1f}s-{end:.1f}s"
+        lang = f"{language}:{language_probability:.0%}" if language else ""
+        conf = f"conf:{s.avg_logprob:.2f}"
+        return f"{ts:<11} | {lang:<7} | {conf:<9} | {text}"
+
     # jsonl
     obj: dict = {
         "timing": {
