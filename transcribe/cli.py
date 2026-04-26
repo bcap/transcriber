@@ -2,13 +2,22 @@ import glob
 import os
 import sys
 
-if not os.environ.get("_TRANSCRIBE_REEXEC"):
+# Necessary as we need to ensure the CUDA libraries are in LD_LIBRARY_PATH before loading PyTorch, which faster-whisper does internally.
+# This is especially an issue in virtual environments where the CUDA libs may not be in the default system path.
+def adjust_and_relaunch():
+    if os.environ.get("_TRANSCRIBE_REEXEC"):
+        return
+
     _cuda_libs = glob.glob(os.path.join(sys.prefix, "lib/python*/site-packages/nvidia/cublas/lib"))
-    if _cuda_libs:
-        _lib = _cuda_libs[0]
-        os.environ["LD_LIBRARY_PATH"] = _lib + (":" + os.environ["LD_LIBRARY_PATH"] if os.environ.get("LD_LIBRARY_PATH") else "")
-        os.environ["_TRANSCRIBE_REEXEC"] = "1"
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+    if not _cuda_libs:
+        return
+
+    _lib = _cuda_libs[0]
+    os.environ["LD_LIBRARY_PATH"] = _lib + (":" + os.environ["LD_LIBRARY_PATH"] if os.environ.get("LD_LIBRARY_PATH") else "")
+    os.environ["_TRANSCRIBE_REEXEC"] = "1"
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+
+adjust_and_relaunch()
 
 import argparse
 import json
@@ -19,6 +28,7 @@ import numpy as np
 import sounddevice as sd
 from faster_whisper import WhisperModel
 from faster_whisper.transcribe import Segment
+from huggingface_hub import try_to_load_from_cache
 
 SAMPLE_RATE = 16000
 CHUNK_MS = 100
@@ -100,6 +110,15 @@ def format_segment(s: Segment, fmt: str, language: str | None = None, language_p
     return json.dumps(obj, ensure_ascii=False)
 
 
+def load_model(device: str) -> WhisperModel:
+    model_id = "large-v3"
+    log.info("loading model: %s on %s", model_id, device)
+    cached = try_to_load_from_cache("Systran/faster-whisper-large-v3", "model.bin")
+    if cached is None:
+        log.warning("Downloading faster-whisper large-v3 model from Hugging Face (~3GB, first run only)...")
+    return WhisperModel(model_id, device=device, compute_type="auto")
+
+
 def transcribe_file(model: WhisperModel, audio: str, output: str | None, fmt: str, kwargs: dict) -> None:
     log.info("transcribing %s", audio)
     segments, info = model.transcribe(audio, **kwargs)
@@ -176,7 +195,6 @@ def transcribe_stream(model: WhisperModel, output: str | None, fmt: str, kwargs:
     except KeyboardInterrupt:
         if len(speech_buf) >= MIN_SPEECH_CHUNKS:
             flush(speech_buf, speech_start)
-        print("\nStopped.", file=sys.stderr)
 
 
 def main():
@@ -188,8 +206,7 @@ def main():
     if args.stream:
         print("Initializing...", file=sys.stderr)
 
-    log.info("loading model: large-v3 on %s", args.device)
-    model = WhisperModel("large-v3", device=args.device, compute_type="auto")
+    model = load_model(args.device)
 
     kwargs = build_transcribe_kwargs(args)
 
