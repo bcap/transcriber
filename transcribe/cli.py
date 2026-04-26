@@ -137,6 +137,7 @@ def transcribe_file(model: WhisperModel, audio: str, output: str | None, fmt: st
 def transcribe_stream(model: WhisperModel, output: str | None, fmt: str, kwargs: dict) -> None:
     audio_q: queue.Queue[np.ndarray] = queue.Queue()
     session_start = time.monotonic()
+    out_file = open(output, "w", encoding="utf-8") if output else sys.stdout
 
     def audio_callback(indata, frames, ts, status):
         if status:
@@ -153,10 +154,7 @@ def transcribe_stream(model: WhisperModel, output: str | None, fmt: str, kwargs:
             if not s.text.strip():
                 continue
             line = format_segment(s, fmt, language=info.language, language_probability=info.language_probability, session_offset=t_start, chunk_duration=chunk_duration)
-            print(line, flush=True)
-            if output:
-                with open(output, "a", encoding="utf-8") as f:
-                    f.write(line + "\n")
+            print(line, file=out_file, flush=True)
 
     speech_buf: list[np.ndarray] = []
     silence_count = 0
@@ -195,6 +193,10 @@ def transcribe_stream(model: WhisperModel, output: str | None, fmt: str, kwargs:
     except KeyboardInterrupt:
         if len(speech_buf) >= MIN_SPEECH_CHUNKS:
             flush(speech_buf, speech_start)
+    finally:
+        if output:
+            out_file.close()
+            log.info("written to %s", output)
 
 
 def main():
