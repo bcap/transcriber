@@ -170,9 +170,6 @@ def transcribe_stream(model: WhisperModel, output: str | None, fmt: str, kwargs:
         sys.stderr.flush()
         stop.set()
 
-    signal.signal(signal.SIGINT, handle_signal)
-    signal.signal(signal.SIGTERM, handle_signal)
-
     def audio_callback(indata, frames, ts, status):
         if status:
             log.debug("sounddevice: %s", status)
@@ -224,11 +221,17 @@ def transcribe_stream(model: WhisperModel, output: str | None, fmt: str, kwargs:
     try:
         with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32",
                             blocksize=CHUNK_SAMPLES, callback=audio_callback):
-            while not stop.is_set():
-                try:
-                    process_chunk(audio_q.get(timeout=0.1))
-                except queue.Empty:
-                    pass
+            prev_sigint = signal.signal(signal.SIGINT, handle_signal)
+            prev_sigterm = signal.signal(signal.SIGTERM, handle_signal)
+            try:
+                while not stop.is_set():
+                    try:
+                        process_chunk(audio_q.get(timeout=0.1))
+                    except queue.Empty:
+                        pass
+            finally:
+                signal.signal(signal.SIGINT, prev_sigint)
+                signal.signal(signal.SIGTERM, prev_sigterm)
     finally:
         if len(speech_buf) >= MIN_SPEECH_CHUNKS:
             flush(speech_buf, speech_start)
