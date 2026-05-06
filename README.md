@@ -11,7 +11,7 @@ Can transcribe from an audio file or in realtime from your microphone
 - [uv](https://github.com/astral-sh/uv)
 - NVIDIA GPU with CUDA support (optional but recommended; falls back to CPU)
 
-## Running
+## Installing / Running
 
 The first run will download the Whisper large-v3 model (~3GB) from Hugging Face. It will work without an account, but creating one and setting `HF_TOKEN` enables faster downloads:
 
@@ -21,13 +21,13 @@ export HF_TOKEN=your_token_here
 
 Get a token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).
 
-### One-shot via uvx
+### One-shot via `uvx`
 
 ```bash
 uvx --from git+https://github.com/bcap/transcriber transcribe -s
 ```
 
-### Persistent install via uv tool
+### Persistent install via `uv tool`
 
 ```bash
 uv tool install git+https://github.com/bcap/transcriber
@@ -40,6 +40,11 @@ transcribe -s
 git clone git@github.com:bcap/transcriber.git
 cd transcriber
 uv run transcribe -s
+```
+
+After cloning, you can install in your system with
+```bash
+uv tool install .
 ```
 
 ## Usage
