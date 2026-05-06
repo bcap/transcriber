@@ -23,6 +23,8 @@ import argparse
 import json
 import logging
 import queue
+import signal
+import threading
 import time
 import numpy as np
 import sounddevice as sd
@@ -159,10 +161,19 @@ def transcribe_file(model: WhisperModel, audio: str, output: str | None, fmt: st
 def transcribe_stream(model: WhisperModel, output: str | None, fmt: str, kwargs: dict) -> None:
     audio_q: queue.Queue[np.ndarray] = queue.Queue()
     session_start = time.monotonic()
+    stop = threading.Event()
     out_file = open(output, "w", encoding="utf-8") if output else sys.stdout
     header = format_header(fmt)
     if header:
         print(header, file=out_file, flush=True)
+
+    def handle_signal(signum, frame):
+        sys.stderr.write("\r  \r")
+        sys.stderr.flush()
+        stop.set()
+
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
 
     def audio_callback(indata, frames, ts, status):
         if status:
@@ -212,13 +223,14 @@ def transcribe_stream(model: WhisperModel, output: str | None, fmt: str, kwargs:
     try:
         with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32",
                             blocksize=CHUNK_SAMPLES, callback=audio_callback):
-            while True:
-                process_chunk(audio_q.get())
-
-    except KeyboardInterrupt:
+            while not stop.is_set():
+                try:
+                    process_chunk(audio_q.get(timeout=0.1))
+                except queue.Empty:
+                    pass
+    finally:
         if len(speech_buf) >= MIN_SPEECH_CHUNKS:
             flush(speech_buf, speech_start)
-    finally:
         if output:
             out_file.close()
             log.info("written to %s", output)
