@@ -164,8 +164,6 @@ def transcribe_stream(model: WhisperModel, output: str | None, fmt: str, kwargs:
     stop = threading.Event()
     out_file = open(output, "w", encoding="utf-8") if output else sys.stdout
     header = format_header(fmt)
-    if header:
-        print(header, file=out_file, flush=True)
 
     def handle_signal(signum, frame):
         sys.stderr.write("\r  \r")
@@ -219,6 +217,9 @@ def transcribe_stream(model: WhisperModel, output: str | None, fmt: str, kwargs:
         print("Transcribing... Press Ctrl+C to stop", file=sys.stderr)
     else:
         raise ValueError(f"unexpected task: {kwargs['task']}")
+
+    if header:
+        print(header, file=out_file, flush=True)
 
     try:
         with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32",
