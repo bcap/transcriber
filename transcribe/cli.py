@@ -38,7 +38,7 @@ SILENCE_RMS_THRESHOLD = 0.01
 SILENCE_CHUNKS_TO_FLUSH = 8   # 800ms of silence triggers transcription
 MIN_SPEECH_CHUNKS = 4          # ignore bursts shorter than 400ms
 
-OUTPUT_FORMATS = ("plain", "annotated", "jsonl")
+OUTPUT_FORMATS = ("plain", "annotated", "jsonl", "markdowntable")
 
 log = logging.getLogger(__name__)
 
@@ -79,6 +79,19 @@ def build_transcribe_kwargs(args) -> dict:
     return kwargs
 
 
+_COL_TS_W = 11    # wide enough for "0.0s-100.0s"
+_COL_LANG_W = 8   # wide enough for "Language" header and "en:100%"
+_COL_CONF_W = 10  # wide enough for "Confidence" header and "conf:-0.15"
+
+
+def format_header(fmt: str) -> str | None:
+    if fmt == "markdowntable":
+        h = f"| {'Timestamp':<{_COL_TS_W}} | {'Language':<{_COL_LANG_W}} | {'Confidence':<{_COL_CONF_W}} | Text |"
+        sep = f"|:{'-' * _COL_TS_W}-|:{'-' * _COL_LANG_W}-|:{'-' * _COL_CONF_W}-|:-----|"
+        return f"{h}\n{sep}"
+    return None
+
+
 def format_segment(s: Segment, fmt: str, language: str | None = None, language_probability: float | None = None, session_offset: float = 0.0, chunk_duration: float | None = None) -> str:
     text = s.text.strip()
     if fmt == "plain":
@@ -86,11 +99,15 @@ def format_segment(s: Segment, fmt: str, language: str | None = None, language_p
 
     start = session_offset + s.start
     end = session_offset + s.end
+    ts = f"{start:.1f}s-{end:.1f}s"
+    lang = f"{language}:{language_probability:.0%}" if language else ""
+    conf = f"conf:{s.avg_logprob:.2f}"
     if fmt == "annotated":
-        ts = f"{start:.1f}s-{end:.1f}s"
-        lang = f"{language}:{language_probability:.0%}" if language else ""
-        conf = f"conf:{s.avg_logprob:.2f}"
-        return f"{ts:<11} | {lang:<7} | {conf:<9} | {text}"
+        return f"{ts:<{_COL_TS_W}} | {lang:<{_COL_LANG_W}} | {conf:<{_COL_CONF_W}} | {text}"
+
+    if fmt == "markdowntable":
+        escaped = text.replace("|", "\\|")
+        return f"| {ts:<{_COL_TS_W}} | {lang:<{_COL_LANG_W}} | {conf:<{_COL_CONF_W}} | {escaped} |"
 
     # jsonl
     obj: dict = {
@@ -127,6 +144,9 @@ def transcribe_file(model: WhisperModel, audio: str, output: str | None, fmt: st
     log.debug("detected language: %s (%.0f%%)", info.language, info.language_probability * 100)
     f = open(output, "w", encoding="utf-8") if output else sys.stdout
     try:
+        header = format_header(fmt)
+        if header:
+            f.write(header + "\n")
         for s in segments:
             log.debug("[%.1fs-%.1fs] %s", s.start, s.end, s.text.strip())
             f.write(format_segment(s, fmt, language=info.language, language_probability=info.language_probability, chunk_duration=s.end - s.start) + "\n")
@@ -140,6 +160,9 @@ def transcribe_stream(model: WhisperModel, output: str | None, fmt: str, kwargs:
     audio_q: queue.Queue[np.ndarray] = queue.Queue()
     session_start = time.monotonic()
     out_file = open(output, "w", encoding="utf-8") if output else sys.stdout
+    header = format_header(fmt)
+    if header:
+        print(header, file=out_file, flush=True)
 
     def audio_callback(indata, frames, ts, status):
         if status:
