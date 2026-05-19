@@ -19,18 +19,19 @@ Key flags:
 - `-i`/`--input`: input audio file (mutually exclusive with `-s`)
 - `-s`/`--stream`: stream from microphone (mutually exclusive with `-i`)
 - `-o`/`--output`: output file (default: stdout)
-- `-f`/`--output-format`: `plain` (default), `annotated`, or `jsonl`
+- `-f`/`--output-format`: `plain` (default), `annotated`, `jsonl`, or `markdowntable`
 - `-l`/`--language`: pin language code (e.g. `en`, `pt`); auto-detect if omitted
 - `-t`/`--translate`: translate to English using Whisper's built-in translation task
 - `-T`/`--temperature`: sampling temperature
 - `-p`/`--prompt`: initial prompt string or `@filepath`
+- `-d`/`--device`: `auto` (default), `cuda`, or `cpu`
 - `-v`/`-vv`: logging verbosity
 
 ## Architecture
 
 `transcribe/cli.py` (single module):
-- `large-v3` model on CUDA/float16
-- Output formats: `plain` (text only), `annotated` (fixed-width columns: lang, confidence, timestamp, text), `jsonl` (structured with `timing`, `speech`, `transcription` subobjects)
+- `large-v3` model; device selectable via `-d` (`auto`/`cuda`/`cpu`), `compute_type="auto"`
+- Output formats: `plain` (text only), `annotated` (fixed-width columns: timestamp, lang, confidence, text), `markdowntable` (same columns as a GitHub-flavored markdown table with header), `jsonl` (structured with `timing`, `speech`, `transcription` subobjects)
 
 ## Features
 

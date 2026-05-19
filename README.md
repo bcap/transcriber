@@ -66,9 +66,10 @@ transcribe -s -o session.txt
 ### Output formats
 
 ```bash
-transcribe -i audio.mp3 -f plain       # plain text (default)
-transcribe -i audio.mp3 -f annotated   # timestamped, with language and confidence
-transcribe -i audio.mp3 -f jsonl       # one JSON object per segment
+transcribe -i audio.mp3 -f plain          # plain text (default)
+transcribe -i audio.mp3 -f annotated      # timestamped, with language and confidence
+transcribe -i audio.mp3 -f markdowntable  # same columns as annotated, as a markdown table
+transcribe -i audio.mp3 -f jsonl          # one JSON object per segment
 ```
 
 **plain**
@@ -79,6 +80,13 @@ okay this is a simple transcriber test
 **annotated**
 ```
 [en:99%]  [conf:-0.18]   [0.8s-7.7s]    okay this is a simple transcriber test
+```
+
+**markdowntable**
+```
+| Timestamp   | Language | Confidence | Text |
+|:------------|:---------|:-----------|:-----|
+| 0.8s-7.7s   | en:99%   | conf:-0.18 | okay this is a simple transcriber test |
 ```
 
 **jsonl**
@@ -93,7 +101,7 @@ okay this is a simple transcriber test
 | `-i`, `--input FILE` | Input audio file (mutually exclusive with `-s`) |
 | `-s`, `--stream` | Stream from microphone (mutually exclusive with `-i`) |
 | `-o`, `--output FILE` | Output file (default: stdout) |
-| `-f`, `--output-format` | `plain` (default), `annotated`, or `jsonl` |
+| `-f`, `--output-format` | `plain` (default), `annotated`, `markdowntable`, or `jsonl` |
 | `-l`, `--language` | Pin language code, e.g. `en`, `pt` (default: auto-detect) |
 | `-t`, `--translate` | Translate to English using Whisper's built-in translation |
 | `-T`, `--temperature` | Sampling temperature |
