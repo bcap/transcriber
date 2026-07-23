@@ -24,7 +24,7 @@ print(f'{major}.{minor}.{patch}')
 
 echo "$current -> $new"
 
-sed -i "s/^version = \"$current\"/version = \"$new\"/" pyproject.toml
+perl -i -pe "s/^version = \"$current\"/version = \"$new\"/" pyproject.toml
 uv lock
 
 git add pyproject.toml uv.lock
